@@ -336,11 +336,11 @@
     align-items: center;
     justify-content: center;
   }
-  /* circle.png logo — fades in on blue */
+  /* NORA wordmark SVG — fades in on blue. Wide aspect, not square. */
   #intro-wipe-logo {
     position: absolute;
-    width: 200px; height: 200px;
-    object-fit: contain;
+    width: 280px;
+    height: auto;
     opacity: 0;
     transition: opacity 0.5s ease;
   }
@@ -1273,6 +1273,42 @@
     width: 100%; height: 100%;
     border: none;
   }
+  /* Facade thumbnail (shown until user clicks play) */
+  .sc-video-portrait-thumb {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  /* Single, branded play button overlaying the thumbnail.
+     Disappears the moment the iframe is swapped in. */
+  .sc-video-portrait-play {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255,255,255,0.95);
+    color: var(--blue, #006eb6);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    transition: transform 0.2s ease, background 0.2s ease;
+    padding: 0;
+  }
+  .sc-video-portrait-play:hover,
+  .sc-video-portrait-play:focus-visible {
+    transform: translate(-50%, -50%) scale(1.08);
+    background: #fff;
+    outline: none;
+  }
+  .sc-video-portrait-play svg {
+    width: 24px; height: 24px;
+    margin-left: 3px;  /* visual centering — play triangles always look offset */
+  }
   .sc-video-portrait-caption {
     margin-top: 0.85rem;
     font-size: 0.7rem;
@@ -1288,6 +1324,60 @@
   .sc-body .sc-video-portrait {
     /* Slight lift so the video aligns with the first paragraph's cap height */
     margin-top: 0.4rem;
+  }
+
+  /* ──────────────────────────────────────────────────────────────
+     INLINE LANDSCAPE VIDEO (.sc-video-inline)
+     Sits as a block-level figure inside .sc-body, full body-column width,
+     16:9 landscape. Used when the case has a proper event-style video
+     (vs. the phone-shot portrait used for AYC).
+     ────────────────────────────────────────────────────────────── */
+  .sc-video-inline {
+    margin: 2.5rem 0 2.75rem;
+    width: 100%;
+  }
+  /* Desktop: let the inline video break out of the 760px body text column
+     so the 16:9 video can breathe. Text stays at reading width; video gets
+     a more cinematic frame. Using negative margins so the figure expands
+     equally on both sides while keeping the body column centered. */
+  @media (min-width: 1100px) {
+    .sc-video-inline {
+      width: calc(100% + 240px);
+      margin-left: -120px;
+      margin-right: -120px;
+      margin-top: 3rem;
+      margin-bottom: 3.25rem;
+    }
+  }
+  @media (min-width: 1400px) {
+    .sc-video-inline {
+      width: calc(100% + 360px);
+      margin-left: -180px;
+      margin-right: -180px;
+    }
+  }
+  .sc-video-inline-frame {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16/9;
+    overflow: hidden;
+    background: var(--navy);
+    box-shadow: 0 18px 50px rgba(0,0,0,0.18);
+    border-radius: 2px;
+  }
+  .sc-video-inline-frame iframe {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    border: none;
+  }
+  .sc-video-inline-caption {
+    margin-top: 0.85rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    line-height: 1.5;
   }
 
   /* Outro / closing block */
@@ -1497,8 +1587,8 @@
   .insta-embed {
     position: relative;
     min-height: 400px;
-    background: #fff;
-    border: 1px solid var(--line);
+    background: transparent;
+    border: none;
   }
   /* Elfsight loader fallback — shown until the widget loads */
   .insta-embed-fallback {
@@ -1724,29 +1814,57 @@
     margin-left: auto;
   }
 
-  /* Single project row per month */
+  /* ── Rows container — holds 1+ project entries per month.
+        Each .tl-row is sized by JS to the same column width, so
+        a month with 2 rows is 2× as wide as a month with 1.    ── */
   .tl-rows {
     flex: 1;
     display: flex;
     flex-direction: row;
-  }
-  .tl-rows .tl-row:nth-child(2) {
-    display: none;
+    /* No min-width: container flexes to fit the rows inside it */
   }
   .tl-row {
-    flex: 1;
+    /* Each row is a fixed-width column (set by JS in sizeImages).
+       The flex-shrink:0 keeps it from collapsing if the month/track
+       layout has rounding errors. No flex:1 here — we want intrinsic
+       widths, not equal splits within a month. */
+    flex-shrink: 0;
     display: flex;
     flex-direction: row;
     align-items: stretch;
-    border-right: 1px solid rgba(255,255,255,0.04);
     cursor: pointer;
     transition: background 0.25s;
     min-width: 0;
+    position: relative;
+    /* Subtle thin divider between items within a SAME month.
+       The strong yellow border between months lives on .tl-month. */
+    border-right: 1px solid rgba(255,255,255,0.06);
   }
+  /* No divider on the last row of a month — the month boundary
+     itself provides that visual break. */
   .tl-row:last-child { border-right: none; }
   .tl-row:hover {
     background: rgba(255,255,255,0.03);
   }
+
+  /* Position indicator — "1 / 2", "2 / 2" etc — shown only when a month
+     has multiple items. Tiny corner label so the reader knows there's
+     more from the same month coming next.                            */
+  .tl-row-position {
+    position: absolute;
+    top: 1.4rem;
+    right: 1.6rem;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(253, 207, 65, 0.55);
+    pointer-events: none;
+    z-index: 2;
+  }
+  /* Hide the indicator when the month has only one item — no need
+     for "1 / 1" noise. JS adds .tl-month--single to those months. */
+  .tl-month--single .tl-row-position { display: none; }
 
   /* Image — 5:4 ratio enforced by JS */
   .tl-img {
@@ -1847,11 +1965,8 @@
     background: rgba(255,255,255,0.2);
     transition: background 0.2s, height 0.2s, width 0.2s;
   }
-  .tl-nav-item.active::after {
-    background: #fdcf41;
-    height: 10px;
-    width: 2px;
-  }
+  /* No vertical indicator — the brightened month name + the
+     progress bar below already signal which month is active. */
   .tl-nav-abbr {
     font-size: 0.65rem;
     font-weight: 700;
@@ -1994,8 +2109,9 @@
     align-items: flex-start;
   }
   .footer-logo-svg {
-    width: 120px;
-    height: 120px;
+    width: 170px;
+    height: auto;
+    display: block;
     opacity: 0.95;
   }
   .fcol-label {
@@ -2819,7 +2935,7 @@
     /* Footer */
     footer { padding: 4rem 1.2rem 2.5rem; }
     .footer-inner { grid-template-columns: 1fr; gap: 2.5rem; }
-    .footer-logo-wrap { display: none; }
+    .footer-logo-svg { width: 140px; }
     .footer-btm { flex-direction: column; gap: 0.5rem; text-align: center; }
 
     /* Overlay — full screen stack on mobile */
@@ -2888,7 +3004,17 @@ font-weight: 700;
 <div id="progress"></div>
 
 <div id="intro-wipe">
-  <img id="intro-wipe-logo" src="circle.png" alt="NORA">
+  <!-- White NORA wordmark for splash. Same path geometry as the nav logo,
+       fill swapped to #fff for the blue background. -->
+  <svg id="intro-wipe-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 115.93 34.02" aria-hidden="true" focusable="false">
+    <g fill="#ffffff">
+      <path d="M17,0a16.93,16.93,0,0,0-9.7,3L16,22.1a1.08,1.08,0,0,0,.49.55H14.93c-.7,0-.94-.09-1.26-.79l-8-17.56A17.11,17.11,0,0,0,4.14,5.86L11.53,22.1a1.08,1.08,0,0,0,.49.55H10.5c-.7,0-.94-.09-1.26-.79L2.78,7.66A17,17,0,0,0,1.55,9.87L7.11,22.1a1.08,1.08,0,0,0,.49.55H6.08c-.7,0-.94-.09-1.26-.79L.57,12.54A17,17,0,0,0,0,16.2l2.69,5.9a1.08,1.08,0,0,0,.49.55H1.66a1.55,1.55,0,0,1-.76-.12A17,17,0,1,0,17,0Zm0,31.56A14.54,14.54,0,0,1,4.75,24.88H28.52l-3.19-2.71a10.72,10.72,0,0,1-3,.48h-3c-.7,0-.94-.09-1.26-.79l-8-17.65A14.55,14.55,0,1,1,17,31.56Z"/>
+      <path d="M55.07,24.87,45.91,12.55V24.87H43V7.68h2.85L55.07,20V7.68h2.85v17.2Z"/>
+      <path d="M74.77,8.75a8.59,8.59,0,0,1,3.29,3.13,8.34,8.34,0,0,1,1.2,4.4,8.41,8.41,0,0,1-1.2,4.42,8.61,8.61,0,0,1-3.29,3.14,9.85,9.85,0,0,1-9.24,0,8.62,8.62,0,0,1-3.29-3.14A8.41,8.41,0,0,1,61,16.28a8.32,8.32,0,0,1,1.2-4.41,8.62,8.62,0,0,1,3.29-3.12,9.89,9.89,0,0,1,9.24,0ZM67.08,11a6.22,6.22,0,0,0-2.26,2.2,6,6,0,0,0,0,6.12,6.35,6.35,0,0,0,2.26,2.22,6.11,6.11,0,0,0,9.19-5.29,5.88,5.88,0,0,0-.82-3.05A6.14,6.14,0,0,0,73.24,11a6,6,0,0,0-3.08-.82A6.1,6.1,0,0,0,67.08,11Z"/>
+      <path d="M90.11,19.67q-.24,0-.79,0H85.24v5.18h-2.9V7.68h7a7.7,7.7,0,0,1,5.11,1.54,5.36,5.36,0,0,1,1.82,4.34A6.26,6.26,0,0,1,95.33,17a5.39,5.39,0,0,1-2.64,2.09l3.85,5.74H93.25Zm2.3-3.45a3.14,3.14,0,0,0,1.08-2.59,3,3,0,0,0-1.08-2.51,5,5,0,0,0-3.09-.84H85.24v6.81h4.08A4.8,4.8,0,0,0,92.41,16.22Z"/>
+      <path d="M102.52,21l-1.64,3.89h-3l7.59-17.2h3l7.51,17.2h-3.09L111.19,21Zm4.33-10.22-3.25,7.64h6.49Z"/>
+    </g>
+  </svg>
   <div id="intro-wipe-dot"></div>
 </div>
 
@@ -3212,17 +3338,29 @@ font-weight: 700;
        float to center it above the body text. -->
   <article class="sc-body">
 
-    <!-- VIDEO (portrait 9:16 — phone-shot) — fcase_video_id = 1135328106 -->
+    <!-- VIDEO (portrait 9:16 — phone-shot) — fcase_video_id = 1135328106
+         Uses a "facade" pattern: shows our own thumbnail + play button.
+         On click, the Vimeo iframe is swapped in with autoplay=1.
+         This avoids Vimeo's poster (which has its own play icon baked in)
+         stacking under Vimeo's player chrome — the "two play buttons" issue. -->
     <figure class="sc-video-portrait">
-      <div class="sc-video-portrait-frame">
-        <iframe
-          class="sc-video-iframe"
-          id="scVideoIframe-ayc-expo-2025"
-          data-src="https://player.vimeo.com/video/1135328106?h=93706d6428&title=0&byline=0&portrait=0"
-          allow="autoplay; fullscreen; picture-in-picture"
-          allowfullscreen
-          title="NORA at Expo 2025 — Video"
-        ></iframe>
+      <div class="sc-video-portrait-frame" data-vimeo-facade data-vimeo-id="1135328106" data-vimeo-hash="93706d6428">
+        <!-- Custom thumbnail. We use our OWN image (not Vimeo's CDN poster,
+             which renders with a play-icon overlay baked in by Vimeo). This
+             is the AYC videographer shooting the smørrebrød plate at Expo —
+             thematic match for the video itself. -->
+        <img
+          class="sc-video-portrait-thumb"
+          src="images/ayc-expo-filming.jpg"
+          alt=""
+          aria-hidden="true"
+          loading="lazy">
+        <!-- Our single play button. Real button for accessibility. -->
+        <button type="button" class="sc-video-portrait-play" aria-label="Play video — NORA at Expo 2025">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M8 5v14l11-7z" fill="currentColor"/>
+          </svg>
+        </button>
       </div>
       <figcaption class="sc-video-portrait-caption">Watch · NORA at Expo 2025</figcaption>
     </figure>
@@ -4219,6 +4357,23 @@ font-weight: 700;
   <article class="sc-body">
     <p>The main goal of connecting young entrepreneurial people from the NORA region has been coming well together through an agile, event-driven approach.</p>
 
+    <!-- Video — sits right after the first paragraph so it's near the top of the
+         reading flow without being the very first thing. Landscape 16:9, full-width
+         within the body column. -->
+    <figure class="sc-video-inline">
+      <div class="sc-video-inline-frame">
+        <iframe
+          class="sc-video-iframe"
+          id="scVideoIframe-ice-aces-2025"
+          data-src="https://player.vimeo.com/video/1191533505?title=0&byline=0&portrait=0"
+          allow="autoplay; fullscreen; picture-in-picture"
+          allowfullscreen
+          title="ACES 2025 — Video"
+        ></iframe>
+      </div>
+      <figcaption class="sc-video-inline-caption">Watch · ACES 2025 highlights</figcaption>
+    </figure>
+
     <p>Not only have we seen the continuation of operations of the Finest Faroe Fund and very successful launch of Pajussi Norge (a food delivery company expanding from Nuuk, Greenland, to Kirkenes, Norway, as a collaboration of two young entrepreneurs from this project), but Swaply has also been established. This new startup owned by a young entrepreneur from the Faroe Islands already attracts investors and earns spots in pitching competitions.</p>
 
     <p>Furthermore, WatchYourEye, a clothing brand established by a young entrepreneur from Northern Norway has expanded to Greenland and Finland.</p>
@@ -4240,22 +4395,6 @@ font-weight: 700;
 
     <p>As ICEAYC nears its end and ACES 2026 is coming, the focus is on fostering more concrete outcomes from the project in addition to securing its continuation onwards from 2027. The community of young people has already grown beyond the NORA region's borders, slowly but surely moving towards its new future identity — a community of Arctic Entrepreneurs.</p>
   </article>
-
-  <div class="sc-section-head">
-    <span class="sc-section-label">Watch · ACES 2025 highlights</span>
-  </div>
-  <section class="sc-video">
-    <div class="sc-video-wrap">
-      <iframe
-        class="sc-video-iframe"
-        id="scVideoIframe-ice-aces-2025"
-        data-src="https://player.vimeo.com/video/1191533505?title=0&byline=0&portrait=0"
-        allow="autoplay; fullscreen; picture-in-picture"
-        allowfullscreen
-        title="ACES 2025 — Video"
-      ></iframe>
-    </div>
-  </section>
 
   <div class="sc-section-head">
     <span class="sc-section-label">From the summit</span>
@@ -4448,9 +4587,18 @@ font-weight: 700;
 <!-- FOOTER -->
 <footer>
   <div class="footer-inner">
-    <!-- Logo -->
+    <!-- Logo — white NORA wordmark for the blue footer.
+         Webflow port: replace with a Brand Asset image set in Site Settings. -->
     <div class="footer-logo-wrap">
-      <img src="circle.png" class="footer-logo-svg" alt="NORA">
+      <svg class="footer-logo-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 115.93 34.02" aria-label="NORA — Nordic Atlantic Cooperation" role="img">
+        <g fill="#ffffff">
+          <path d="M17,0a16.93,16.93,0,0,0-9.7,3L16,22.1a1.08,1.08,0,0,0,.49.55H14.93c-.7,0-.94-.09-1.26-.79l-8-17.56A17.11,17.11,0,0,0,4.14,5.86L11.53,22.1a1.08,1.08,0,0,0,.49.55H10.5c-.7,0-.94-.09-1.26-.79L2.78,7.66A17,17,0,0,0,1.55,9.87L7.11,22.1a1.08,1.08,0,0,0,.49.55H6.08c-.7,0-.94-.09-1.26-.79L.57,12.54A17,17,0,0,0,0,16.2l2.69,5.9a1.08,1.08,0,0,0,.49.55H1.66a1.55,1.55,0,0,1-.76-.12A17,17,0,1,0,17,0Zm0,31.56A14.54,14.54,0,0,1,4.75,24.88H28.52l-3.19-2.71a10.72,10.72,0,0,1-3,.48h-3c-.7,0-.94-.09-1.26-.79l-8-17.65A14.55,14.55,0,1,1,17,31.56Z"/>
+          <path d="M55.07,24.87,45.91,12.55V24.87H43V7.68h2.85L55.07,20V7.68h2.85v17.2Z"/>
+          <path d="M74.77,8.75a8.59,8.59,0,0,1,3.29,3.13,8.34,8.34,0,0,1,1.2,4.4,8.41,8.41,0,0,1-1.2,4.42,8.61,8.61,0,0,1-3.29,3.14,9.85,9.85,0,0,1-9.24,0,8.62,8.62,0,0,1-3.29-3.14A8.41,8.41,0,0,1,61,16.28a8.32,8.32,0,0,1,1.2-4.41,8.62,8.62,0,0,1,3.29-3.12,9.89,9.89,0,0,1,9.24,0ZM67.08,11a6.22,6.22,0,0,0-2.26,2.2,6,6,0,0,0,0,6.12,6.35,6.35,0,0,0,2.26,2.22,6.11,6.11,0,0,0,9.19-5.29,5.88,5.88,0,0,0-.82-3.05A6.14,6.14,0,0,0,73.24,11a6,6,0,0,0-3.08-.82A6.1,6.1,0,0,0,67.08,11Z"/>
+          <path d="M90.11,19.67q-.24,0-.79,0H85.24v5.18h-2.9V7.68h7a7.7,7.7,0,0,1,5.11,1.54,5.36,5.36,0,0,1,1.82,4.34A6.26,6.26,0,0,1,95.33,17a5.39,5.39,0,0,1-2.64,2.09l3.85,5.74H93.25Zm2.3-3.45a3.14,3.14,0,0,0,1.08-2.59,3,3,0,0,0-1.08-2.51,5,5,0,0,0-3.09-.84H85.24v6.81h4.08A4.8,4.8,0,0,0,92.41,16.22Z"/>
+          <path d="M102.52,21l-1.64,3.89h-3l7.59-17.2h3l7.51,17.2h-3.09L111.19,21Zm4.33-10.22-3.25,7.64h6.49Z"/>
+        </g>
+      </svg>
     </div>
 
     <!-- Address -->
@@ -4587,7 +4735,7 @@ font-weight: 700;
     var wipe = document.getElementById('intro-wipe');
     if (!wipe) return;
 
-    // Step 1 — circle.png fades in
+    // Step 1 — NORA wordmark fades in
     setTimeout(function () {
       wipe.classList.add('step-logo');
     }, 100);
@@ -4916,53 +5064,79 @@ font-weight: 700;
 
     if (!outer || !track) return;
 
-    // ── Size images to enforce correct ratio ────────────────────────────────────
+    // ── Size images, rows, months, and label cells ────────────────────────────
+    // Layout strategy: every .tl-row gets the SAME width (one editorial column).
+    // A .tl-month containing N rows is therefore N columns wide. Label cells in
+    // the top bar match their corresponding month's width 1:1 so they stay in
+    // sync as the track shifts left under them. JS also flags single-row months
+    // with .tl-month--single so the "1 / N" position indicator is suppressed
+    // when there's only one item.
     function sizeImages () {
       var isMobile = window.innerWidth <= 768;
-
-      // Panel height = sticky height minus labelsBar + tl-nav
       var labelsH = isMobile ? 44 : 58;
       var navH = isMobile ? 40 : 52;
       var panelH = sticky.clientHeight - labelsH - navH;
 
-      if (isMobile) {
-        // On mobile, rows stack vertically (image on top, text below)
-        // Use ~50% of panel for image, rest for text content
-        var imgH = Math.round(panelH * 0.5);
-        var imgW = Math.round(imgH * (16 / 9));
-        // Month width = full image width (row is column-direction)
-        var monthW = Math.max(imgW, Math.round(window.innerWidth * 0.85));
+      var colW;        // width of a single row (one editorial column)
+      var imgW, imgH;  // image box inside a row
 
-        document.querySelectorAll('[data-tl-img]').forEach(function (el) {
-          el.style.width = monthW + 'px';
+      if (isMobile) {
+        // Mobile: image-on-top, text-below stacking inside each row
+        imgH = Math.round(panelH * 0.5);
+        imgW = Math.round(imgH * (16 / 9));
+        colW = Math.max(imgW, Math.round(window.innerWidth * 0.85));
+
+        document.querySelectorAll('.tl-row [data-tl-img]').forEach(function (el) {
+          el.style.width = colW + 'px';
           el.style.height = imgH + 'px';
           el.style.alignSelf = 'stretch';
         });
-        document.querySelectorAll('.tl-month').forEach(function (el) {
-          el.style.width = monthW + 'px';
-        });
-        document.querySelectorAll('.tl-label-cell').forEach(function (el) {
-          el.style.width = monthW + 'px';
-        });
       } else {
-        // Desktop: image beside text in a row
-        var imgH = Math.round(panelH * 0.85);
-        var imgW = Math.round(imgH * (5 / 4));
+        // Desktop: image beside text inside each row
+        imgH = Math.round(panelH * 0.85);
+        imgW = Math.round(imgH * (5 / 4));
+        colW = imgW + 32 + 380;  // image + gap + text column
 
-        document.querySelectorAll('[data-tl-img]').forEach(function (el) {
+        document.querySelectorAll('.tl-row [data-tl-img]').forEach(function (el) {
           el.style.width = imgW + 'px';
           el.style.height = imgH + 'px';
           el.style.alignSelf = 'center';
         });
-
-        var colW = imgW + 32 + 380;
-        document.querySelectorAll('.tl-month').forEach(function (el) {
-          el.style.width = colW + 'px';
-        });
-        document.querySelectorAll('.tl-label-cell').forEach(function (el) {
-          el.style.width = colW + 'px';
-        });
       }
+
+      // Apply width to each .tl-row (1 column) and roll up to month total
+      document.querySelectorAll('.tl-row').forEach(function (el) {
+        el.style.width = colW + 'px';
+      });
+
+      // Cache month-by-month layout for active-month detection
+      outer._monthOffsets = [];
+      var runningX = 0;
+      document.querySelectorAll('.tl-month').forEach(function (month, idx) {
+        var rows = month.querySelectorAll('.tl-row');
+        var rowCount = rows.length;
+        month.classList.toggle('tl-month--single', rowCount === 1);
+        var monthW = colW * rowCount;
+        month.style.width = monthW + 'px';
+
+        // Stamp "1 / N", "2 / N" labels on each row inside the month
+        rows.forEach(function (row, rIdx) {
+          var existing = row.querySelector('.tl-row-position');
+          if (existing) existing.remove();
+          var pos = document.createElement('div');
+          pos.className = 'tl-row-position';
+          pos.textContent = (rIdx + 1) + ' / ' + rowCount;
+          row.appendChild(pos);
+        });
+
+        // Matching label cell width
+        var labelCell = labelsTrack && labelsTrack.children[idx];
+        if (labelCell) labelCell.style.width = monthW + 'px';
+
+        // Record start offset for active-month detection
+        outer._monthOffsets.push({ start: runningX, end: runningX + monthW });
+        runningX += monthW;
+      });
     }
 
     // ── Velocity-based horizontal scroll ──────────────────────────────────────
@@ -5016,7 +5190,21 @@ font-weight: 700;
       var progress = travel > 0 ? trackPos / travel : 0;
       if (bar) bar.style.width = (progress * 100) + '%';
 
-      var activeIdx = Math.min(MONTHS - 1, Math.floor(progress * MONTHS));
+      // Active month: find which month the LEFT edge of the viewport is in.
+      // We compare trackPos (the px offset of the leftmost visible content)
+      // against each month's cached start/end. This works correctly even when
+      // months have different widths (variable items-per-month). A small
+      // forward bias means the next month "lights up" once it's clearly on-stage.
+      var offsets = outer._monthOffsets || [];
+      var focusX = trackPos + (viewport.clientWidth * 0.25);
+      var activeIdx = 0;
+      for (var i = 0; i < offsets.length; i++) {
+        if (focusX >= offsets[i].start && focusX < offsets[i].end) {
+          activeIdx = i;
+          break;
+        }
+        if (i === offsets.length - 1) activeIdx = i;
+      }
       navItems.forEach(function (el, i) {
         el.classList.toggle('active', i === activeIdx);
       });
@@ -5123,7 +5311,9 @@ font-weight: 700;
     navItems.forEach(function (el, i) {
       el.addEventListener('click', function () {
         var travel = outer._travel || 0;
-        var target = (i / (MONTHS - 1)) * travel;
+        var offsets = outer._monthOffsets || [];
+        // Jump to the start of the clicked month (clamped to travel range)
+        var target = offsets[i] ? Math.min(offsets[i].start, travel) : (i / (MONTHS - 1)) * travel;
 
         // Animate trackPos to target
         var start = trackPos;
@@ -5760,6 +5950,47 @@ font-weight: 700;
     a.addEventListener('click', e => {
       const t = document.querySelector(a.getAttribute('href'));
       if (t) { e.preventDefault(); t.scrollIntoView({ behavior: 'smooth' }); }
+    });
+  });
+
+  /* ──────────────────────────────────────────────────────────────
+     VIMEO FACADE
+     Click handler for .sc-video-portrait-frame[data-vimeo-facade].
+     Replaces the thumbnail + play button with an autoplay-enabled
+     Vimeo iframe. This avoids the "two play buttons" issue where
+     Vimeo's poster image has a baked-in play icon stacked under
+     Vimeo's own player chrome play overlay.
+     ────────────────────────────────────────────────────────────── */
+  document.querySelectorAll('.sc-video-portrait-frame[data-vimeo-facade]').forEach(function (frame) {
+    var playBtn = frame.querySelector('.sc-video-portrait-play');
+    if (!playBtn) return;
+    playBtn.addEventListener('click', function () {
+      var id = frame.getAttribute('data-vimeo-id');
+      var hash = frame.getAttribute('data-vimeo-hash');
+      if (!id) return;
+      var params = [
+        'autoplay=1',
+        'muted=1',     // browsers require muted for autoplay
+        'title=0',
+        'byline=0',
+        'portrait=0',
+        'dnt=1'
+      ];
+      if (hash) params.unshift('h=' + hash);
+      // #t=0.5 starts the video at 0.5s — skips past any title/play-icon
+      // graphics that may be baked into the very first frame of the video
+      // (common with TikTok/Reels-style exports). Combined with autoplay,
+      // the viewer never sees that frame.
+      var src = 'https://player.vimeo.com/video/' + id + '?' + params.join('&') + '#t=0.5';
+      var ifr = document.createElement('iframe');
+      ifr.className = 'sc-video-iframe';
+      ifr.src = src;
+      ifr.setAttribute('allow', 'autoplay; fullscreen; picture-in-picture');
+      ifr.setAttribute('allowfullscreen', '');
+      ifr.setAttribute('title', playBtn.getAttribute('aria-label') || 'Video');
+      // Wipe the facade contents and insert the iframe
+      frame.innerHTML = '';
+      frame.appendChild(ifr);
     });
   });
 </script>
