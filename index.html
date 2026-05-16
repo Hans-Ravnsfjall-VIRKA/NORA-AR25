@@ -887,6 +887,7 @@
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     opacity: 0;
+    pointer-events: none; /* ignored while hidden — prevents ghost clicks */
     transform: rotate(-90deg) scale(0.6);
     transition: opacity 0.4s ease 0.4s,
                 transform 0.5s cubic-bezier(0.22,1,0.36,1) 0.4s,
@@ -895,6 +896,7 @@
   .sc-overlay.open ~ .sc-close,
   .sc-close.visible {
     opacity: 1;
+    pointer-events: auto;
     transform: rotate(0deg) scale(1);
   }
   .sc-close:hover {
@@ -1761,12 +1763,23 @@
   }
   .tl-label-cell {
     flex-shrink: 0;
+    position: relative;
+    background: rgba(56,89,136,0.98);
+    border-right: 2px solid rgba(253,207,65,0.35);
+    overflow: hidden;  /* keep label content inside its month cell */
+  }
+  /* Inner wrapper — this is what gets translated to keep the label visible
+     at the left edge of the bar while its month section scrolls past. */
+  .tl-label-inner {
+    position: absolute;
+    top: 0; left: 0;
+    height: 100%;
     display: flex;
     align-items: center;
     gap: 1rem;
     padding: 0 2.4rem;
-    background: rgba(56,89,136,0.98);
-    border-right: 2px solid rgba(253,207,65,0.35);
+    white-space: nowrap;
+    will-change: transform;
   }
 
   /* ── Scrolling viewport ── */
@@ -2405,33 +2418,40 @@
   .pd-overlay.open .pd-outcomes      { opacity: 1; transform: none; transition-delay: 0.63s; }
   .pd-overlay.open .pd-link          { opacity: 1; transform: none; transition-delay: 0.70s; }
 
-  /* Close button — spins in */
+  /* Close button — matches .sc-close (feature case overlay) for visual
+     consistency: same round white pill, charcoal X, navy hover. */
   .pd-close {
     position: fixed;
-    top: 1.5rem; right: 2rem;
+    top: 1.5rem; right: 1.5rem;
     z-index: 1003;
-    width: 44px; height: 44px;
-    border: 1px solid rgba(255,255,255,0.25);
-    background: rgba(56,89,136,0.9);
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    border: 1px solid rgba(69,69,71,0.15);
+    background: rgba(255,255,255,0.92);
     backdrop-filter: blur(8px);
-    color: #ffffff;
-    font-size: 1.1rem;
+    color: var(--charcoal);
+    font-size: 1.05rem;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     opacity: 0;
-    transform: rotate(-90deg) scale(0.5);
-    transition: opacity 0.4s ease 0.6s,
-                transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.6s,
-                background 0.2s, border-color 0.2s, color 0.2s;
+    pointer-events: none; /* ignored while hidden — prevents ghost clicks */
+    transform: rotate(-90deg) scale(0.6);
+    transition: opacity 0.4s ease 0.4s,
+                transform 0.5s cubic-bezier(0.22,1,0.36,1) 0.4s,
+                background 0.2s, color 0.2s, border-color 0.2s;
   }
-  .pd-overlay.open .pd-close {
+  /* Visible state — selector targets the button as adjacent sibling of an
+     opened .pd-overlay, same pattern as .sc-close. */
+  .pd-overlay.open ~ .pd-close,
+  .pd-close.visible {
     opacity: 1;
+    pointer-events: auto;
     transform: rotate(0deg) scale(1);
   }
   .pd-close:hover {
-    background: #fdcf41;
-    border-color: #fdcf41;
-    color: #454547;
+    background: var(--navy);
+    color: #fff;
+    border-color: var(--navy);
   }
 
   /* Content inner padding */
@@ -2950,7 +2970,7 @@
     .pd-inner { padding: 2rem 1.5rem; }
     .pd-title { font-size: clamp(1.4rem, 5vw, 2rem); }
     .pd-meta { flex-wrap: wrap; gap: 1.2rem; }
-    .pd-close { top: 1rem; right: 1rem; }
+    .pd-close { top: 1rem; right: 1rem; width: 44px; height: 44px; }
   }
 
   /* ── SMALL MOBILE (≤ 420px) ───────────────────────────────── */
@@ -4662,7 +4682,6 @@ font-weight: 700;
     <div class="pd-thumbs" id="pdThumbs"></div>
   </div>
   <div class="pd-content-panel">
-    <button class="pd-close" id="pdClose" aria-label="Close">&#x2715;</button>
     <div class="pd-inner">
       <div class="pd-eyebrow" id="pdEyebrow"></div>
       <h2 class="pd-title" id="pdTitle"></h2>
@@ -4674,6 +4693,13 @@ font-weight: 700;
     </div>
   </div>
 </div>
+
+<!-- Close button — sibling of .pd-overlay, NOT inside it.
+     The content panel has a transform, which would make position:fixed
+     relative to the panel instead of the viewport. Keeping the button
+     as a sibling lets position:fixed behave normally. Visible only when
+     .pd-overlay.open via the adjacent-sibling selector in CSS. -->
+<button class="pd-close" id="pdClose" aria-label="Close" type="button">&#x2715;</button>
 
 <script>
   // Progress bar
@@ -5041,16 +5067,21 @@ font-weight: 700;
     var outer = document.getElementById('tl-outer');
     var labelsTrack = document.getElementById('tl-labels-track');
 
-    // Build label cells from month data
+    // Build label cells from month data. Each cell has an inner wrapper
+    // that we can translate independently of the cell — this is what makes
+    // the month label "stick" to the left edge while its row content
+    // scrolls past underneath.
     if (labelsTrack) {
       var months = ['January','February','March','April','May','June',
                     'July','August','September','October','November','December'];
       labelsTrack.innerHTML = months.map(function(m, i) {
         var num = '2025 · ' + (i < 9 ? '0' : '') + (i + 1);
         return '<div class="tl-label-cell">' +
-                 '<div class="tl-dot"></div>' +
-                 '<span class="tl-mname">' + m + '</span>' +
-                 '<span class="tl-mnum">' + num + '</span>' +
+                 '<div class="tl-label-inner">' +
+                   '<div class="tl-dot"></div>' +
+                   '<span class="tl-mname">' + m + '</span>' +
+                   '<span class="tl-mnum">' + num + '</span>' +
+                 '</div>' +
                '</div>';
       }).join('');
     }
@@ -5060,7 +5091,6 @@ font-weight: 700;
     var bar = document.getElementById('tl-bar');
     var navItems = document.querySelectorAll('.tl-nav-item');
     var MONTHS = 12;
-    var HEADER = 0; // nav is no longer sticky, so no header offset to compensate for
 
     if (!outer || !track) return;
 
@@ -5139,29 +5169,26 @@ font-weight: 700;
       });
     }
 
-    // ── Velocity-based horizontal scroll ──────────────────────────────────────
+    // ── Scroll-driven horizontal timeline ──────────────────────────────────────
     //
-    // Strategy: intercept wheel events on the sticky panel. Instead of mapping
-    // page scroll position → track position, we maintain a virtual "trackPos"
-    // and drive it directly from wheel delta — but with a speed amplifier that
-    // kicks in when the user scrolls fast.
-    //
-    //   Slow scroll  (|delta| ≤ 10 px)  → multiplier ≈ 1×   (reads normally)
-    //   Medium scroll (|delta| ~30 px)  → multiplier ≈ 4×
-    //   Fast scroll  (|delta| ≥ 80 px)  → multiplier ≈ 10×  (flies through)
-    //
-    // When at the start (trackPos=0) and scrolling up, or at the end and
-    // scrolling down, we let the event fall through to the page so the user
-    // can leave the section naturally.
-    //
-    // The outer div is given a minimal height (just viewport height) — the
-    // sticky panel simply pins and the wheel handler takes over completely.
+    // Strategy: The outer div is sized to (viewport height + horizontal travel).
+    // As the page scrolls down through it, the inner sticky panel pins at the
+    // top of the viewport (native position:sticky), and we derive the timeline's
+    // horizontal offset (trackPos) directly from how many pixels of the outer
+    // have scrolled past. No wheel handler, no scroll-locking, no activation
+    // flags — works identically for wheel, trackpad, scroll bar, and keyboard.
 
     var trackPos = 0; // current horizontal offset in px
     var rafId = null;
-    var isActive = false; // are we inside the timeline zone?
 
     // ── Set outer height ────────────────────────────────────────────────────
+    // The outer div is sized to (viewport height + horizontal travel). As the
+    // page scrolls through this tall outer, the panel (position:sticky) pins
+    // at the top of the viewport, and we map the scrolled-past distance into
+    // trackPos. This is a classic scroll-jacking pattern and it removes any
+    // dependency on wheel events, cursor position, or activation flags —
+    // every input method that produces page scroll (wheel, trackpad, scroll
+    // bar, keyboard, touch) drives the timeline correctly.
     function setHeight () {
       sizeImages();
       requestAnimationFrame(function () {
@@ -5169,15 +5196,25 @@ font-weight: 700;
           var trackW = track.scrollWidth;
           var vpW = viewport.clientWidth;
           outer._travel = Math.max(0, trackW - vpW);
-          outer.style.height = (window.innerHeight - HEADER + 2) + 'px';
+          // Outer height = 1 viewport (the pin duration) + the horizontal travel.
+          // Scrolling through `travel` pixels of page advance = full horizontal scroll.
+          outer.style.height = (window.innerHeight + outer._travel) + 'px';
         });
       });
     }
     setHeight();
     window.addEventListener('resize', function () {
       setHeight();
-      trackPos = 0;
-      renderTrack();
+      // Invalidate cached label widths (label inner widths may change between
+      // mobile and desktop because of different padding rules).
+      if (labelsTrack) {
+        Array.prototype.forEach.call(labelsTrack.children, function (cell) {
+          var inner = cell.firstElementChild;
+          if (inner) inner._w = 0;
+        });
+      }
+      // Re-sync trackPos to current scroll position after resize
+      updateFromScroll();
     });
 
     // ── Render ─────────────────────────────────────────────────────────────────
@@ -5190,12 +5227,29 @@ font-weight: 700;
       var progress = travel > 0 ? trackPos / travel : 0;
       if (bar) bar.style.width = (progress * 100) + '%';
 
-      // Active month: find which month the LEFT edge of the viewport is in.
-      // We compare trackPos (the px offset of the leftmost visible content)
-      // against each month's cached start/end. This works correctly even when
-      // months have different widths (variable items-per-month). A small
-      // forward bias means the next month "lights up" once it's clearly on-stage.
+      // ── Sticky month labels ───────────────────────────────────────────────
+      // Each label cell's INNER content is translated so that, while the cell
+      // is straddling the viewport's left edge, the label "sticks" visually
+      // at x=0. It only starts moving once the cell's right edge has reached
+      // the label's natural right edge — at which point the next month's
+      // cell takes over.
       var offsets = outer._monthOffsets || [];
+      if (labelsTrack) {
+        var cells = labelsTrack.children;
+        for (var ci = 0; ci < cells.length && ci < offsets.length; ci++) {
+          var off = offsets[ci];
+          var cellW = off.end - off.start;
+          var inner = cells[ci].firstElementChild; // .tl-label-inner
+          if (!inner) continue;
+          var pastLeft = trackPos - off.start;
+          var labelW = inner._w || (inner._w = inner.offsetWidth);
+          var maxShift = Math.max(0, cellW - labelW);
+          var x = Math.max(0, Math.min(pastLeft, maxShift));
+          inner.style.transform = 'translateX(' + x + 'px)';
+        }
+      }
+
+      // ── Active month indicator ────────────────────────────────────────────
       var focusX = trackPos + (viewport.clientWidth * 0.25);
       var activeIdx = 0;
       for (var i = 0; i < offsets.length; i++) {
@@ -5210,126 +5264,69 @@ font-weight: 700;
       });
     }
 
-    // ── Speed amplifier ────────────────────────────────────────────────────────
-    // Maps raw |delta| to a multiplier. Smooth-scroll devices send small deltas
-    // (1–5 px per event), trackpads send medium (10–40), fast wheel sends 100+.
-    function amplify (delta) {
-      var abs = Math.abs(delta);
-      // Soft threshold curve: below 8px → 1×, ramps up to 10× at 80px+
-      var mult;
-      if (abs <= 8) {
-        mult = 1;
-      } else if (abs <= 80) {
-        // Linear ramp 1× → 10× between 8 and 80
-        mult = 1 + (abs - 8) / (80 - 8) * 9;
-      } else {
-        mult = 10;
-      }
-      return delta * mult;
-    }
-
-    // ── Wheel event handler ────────────────────────────────────────────────────
-    function onWheel (e) {
+    // ── Scroll → trackPos mapper ──────────────────────────────────────────────
+    // Maps the page's scroll position into the timeline's horizontal offset.
+    // The outer div spans (viewport + travel) pixels of page. While the outer's
+    // top is below the viewport top, trackPos=0. While it's between 0 and
+    // -travel (i.e. we've scrolled `travel` pixels into the outer), trackPos
+    // linearly increases from 0 to travel. Past that, trackPos stays at travel
+    // and the panel un-pins naturally as the user keeps scrolling.
+    var clickAnimRunning = false;
+    function updateFromScroll () {
+      // If a click-to-jump animation is running, it owns trackPos until it ends.
+      if (clickAnimRunning) return;
       var travel = outer._travel || 0;
-      if (travel === 0 || !tlActive) return;
-
-      var delta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
-
-      if (delta < 0 && trackPos <= 0) return;
-      if (delta > 0 && trackPos >= travel) return;
-
-      e.preventDefault();
-
-      trackPos += amplify(delta);
-      trackPos = Math.max(0, Math.min(travel, trackPos));
-
-      if (rafId) cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(renderTrack);
+      var rect = outer.getBoundingClientRect();
+      // How many pixels of the outer div have scrolled past the viewport top?
+      var scrolledPast = -rect.top;
+      var newPos = Math.max(0, Math.min(travel, scrolledPast));
+      if (Math.abs(newPos - trackPos) > 0.5) {
+        trackPos = newPos;
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(renderTrack);
+      }
     }
-
-    // Attach to sticky panel (non-passive so we can preventDefault)
-    sticky.addEventListener('wheel', onWheel, { passive: false });
-
-    // ── Also handle the sticky panel entering/leaving viewport ──────────────
-    // When the page scrolls the outer div into view, we activate; when it leaves
-    // we reset trackPos so re-entry starts from the beginning.
-    // ── Trigger: activate when tl-sticky top hits 100px (flush under nav) ────────
-    var tlActive = false;
-    var tlDone = false; // true once timeline has been scrolled to the end
-    var lockScrollY = null;
-    var lastScrollY = window.scrollY;
-    window.addEventListener('scroll', function () {
-      var scrollingDown = window.scrollY > lastScrollY;
-      lastScrollY = window.scrollY;
-      var rect = sticky.getBoundingClientRect();
-      var atTrigger = rect.top <= HEADER;
-      var inView = rect.bottom > 0;
-      if (atTrigger && inView && scrollingDown && !tlDone) {
-        if (!tlActive) {
-          lockScrollY = window.scrollY;
-          tlActive = true;
-        }
-      } else if (!atTrigger || !inView) {
-        tlActive = false;
-        lockScrollY = null;
-        if (rect.top > HEADER) {
-          // Scrolled back above — reset so it can play again on next downward pass
-          tlDone = false;
-          trackPos = 0;
-          renderTrack();
-        }
-      }
-    }, { passive: true });
-
-    // When active, hold page scroll position
-    window.addEventListener('scroll', function () {
-      if (tlActive && lockScrollY !== null) {
-        var diff = window.scrollY - lockScrollY;
-
-        // Track finished — release and mark done
-        if (diff > 1 && trackPos >= (outer._travel || 0)) {
-          tlActive = false;
-          tlDone = true;
-          lockScrollY = null;
-          return;
-        }
-        // Scrolling up at start — release
-        if (diff < -1 && trackPos <= 0) {
-          tlActive = false;
-          lockScrollY = null;
-          return;
-        }
-        if (Math.abs(diff) > 1) {
-          window.scrollTo(0, lockScrollY);
-        }
-      }
-    }, { passive: false });
+    window.addEventListener('scroll', updateFromScroll, { passive: true });
+    updateFromScroll();
 
     renderTrack();
 
     // ── Click month nav to jump ────────────────────────────────────────────────
+    // Animates trackPos AND scrolls the page so they stay in sync. We set
+    // clickAnimRunning so the scroll listener doesn't fight us during the tween.
     navItems.forEach(function (el, i) {
       el.addEventListener('click', function () {
         var travel = outer._travel || 0;
         var offsets = outer._monthOffsets || [];
-        // Jump to the start of the clicked month (clamped to travel range)
         var target = offsets[i] ? Math.min(offsets[i].start, travel) : (i / (MONTHS - 1)) * travel;
 
-        // Animate trackPos to target
-        var start = trackPos;
-        var diff = target - start;
+        // Calculate the page scroll position that corresponds to this trackPos:
+        // it's the outer's top offset + target (since trackPos = -outer.top while pinned).
+        var outerTop = window.scrollY + outer.getBoundingClientRect().top;
+        var targetScroll = outerTop + target;
+
+        // Animate trackPos AND window.scrollY together
+        var startPos = trackPos;
+        var startScroll = window.scrollY;
+        var diffPos = target - startPos;
+        var diffScroll = targetScroll - startScroll;
         var t0 = null;
-        var DUR = 500; // ms
+        var DUR = 500;
+        clickAnimRunning = true;
 
         function animate (ts) {
           if (!t0) t0 = ts;
           var elapsed = ts - t0;
           var p = Math.min(1, elapsed / DUR);
-          // ease-out cubic
-          var ep = 1 - Math.pow(1 - p, 3);
-          trackPos = start + diff * ep;
+          var ep = 1 - Math.pow(1 - p, 3); // ease-out cubic
+          trackPos = startPos + diffPos * ep;
+          window.scrollTo(0, startScroll + diffScroll * ep);
           renderTrack();
-          if (p < 1) requestAnimationFrame(animate);
+          if (p < 1) {
+            requestAnimationFrame(animate);
+          } else {
+            clickAnimRunning = false;
+          }
         }
         requestAnimationFrame(animate);
       });
@@ -5526,16 +5523,40 @@ font-weight: 700;
       var params = '?w=1200&h=900&q=85&fit=crop&crop=center';
       var thumbParams = '?w=300&h=240&q=70&fit=crop&crop=center';
 
-      // imgMain fade transition — set before any src change
-      imgMain.style.transition = 'opacity 0.2s';
+      // Helper: swap imgMain to a new src cleanly. Fades the current image
+      // out, waits for the next image to fully load BEFORE fading in. This
+      // prevents the previous image from hanging visible while the new one
+      // is still downloading (which was happening because we were setting
+      // opacity:1 immediately after src=, regardless of load state).
+      function swapMainImage (newSrc, alt) {
+        imgMain.style.transition = 'opacity 0.2s';
+        imgMain.style.opacity = '0';
 
-      // Main image
-      imgMain.style.opacity = '0';
-      setTimeout(function() {
-        imgMain.src = baseUrl + p.images[0] + params;
-        imgMain.style.opacity = '1';
-      }, 50);
-      imgMain.alt = p.title;
+        // Preload the new image off-DOM. Only flip the src/opacity once it's
+        // ready, so what fades in is the new image, never the old one.
+        var loader = new Image();
+        loader.onload = function () {
+          imgMain.src = newSrc;
+          if (alt !== undefined) imgMain.alt = alt;
+          // Tiny delay so the opacity:0 transition has visibly completed
+          // before we start fading the new image in.
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+              imgMain.style.opacity = '1';
+            });
+          });
+        };
+        loader.onerror = function () {
+          // Fall back to direct assign on error so we don't get stuck blank.
+          imgMain.src = newSrc;
+          if (alt !== undefined) imgMain.alt = alt;
+          imgMain.style.opacity = '1';
+        };
+        loader.src = newSrc;
+      }
+
+      // Main image — fade out, then load + fade in
+      swapMainImage(baseUrl + p.images[0] + params, p.title);
 
       // Thumbnails
       thumbsEl.innerHTML = '';
@@ -5547,11 +5568,7 @@ font-weight: 700;
         img.alt = '';
         div.appendChild(img);
         div.addEventListener('click', function () {
-          imgMain.style.opacity = '0';
-          setTimeout(function () {
-            imgMain.src = baseUrl + id + params;
-            imgMain.style.opacity = '1';
-          }, 200);
+          swapMainImage(baseUrl + id + params);
           thumbsEl.querySelectorAll('.pd-thumb').forEach(function (t) {
             t.classList.remove('active');
           });
@@ -5595,10 +5612,21 @@ font-weight: 700;
       setTimeout(function () { closeBtn.focus(); }, 50);
     }
 
-    function closeOverlay() {
+    // Tracks the moment the overlay was opened/closed. Click events that
+    // fall within ~250ms of a close are ignored, so a stray bubbling click
+    // (e.g. from a close that visually overlaps a row underneath) cannot
+    // reopen the overlay immediately.
+    var lastCloseAt = 0;
+
+    function closeOverlay (e) {
+      if (e) {
+        e.stopPropagation();
+        if (e.preventDefault) e.preventDefault();
+      }
       overlay.classList.remove('open');
       backdrop.classList.remove('open');
       document.body.style.overflow = '';
+      lastCloseAt = Date.now();
     }
 
     // ── Wire up tl-rows ─────────────────────────────────────────────────────
@@ -5610,6 +5638,14 @@ font-weight: 700;
       row.appendChild(hint);
 
       row.addEventListener('click', function () {
+        // Guard: ignore clicks fired within 250ms of a close — avoids the
+        // "click X to close, X bubbles to row underneath, row reopens"
+        // ping-pong. Without this, a single close can register as a re-open
+        // if any event slips through stopPropagation (e.g. focus-related).
+        if (Date.now() - lastCloseAt < 250) return;
+        // Also guard against double-open while the overlay is already open
+        // (defensive — closes can be initiated by ESC mid-action).
+        if (overlay.classList.contains('open')) return;
         openProject(i);
       });
     });
@@ -5618,7 +5654,9 @@ font-weight: 700;
     closeBtn.addEventListener('click', closeOverlay);
     backdrop.addEventListener('click', closeOverlay);
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') closeOverlay();
+      if (e.key === 'Escape' && overlay.classList.contains('open')) {
+        closeOverlay(e);
+      }
     });
   }());
 
