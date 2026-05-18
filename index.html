@@ -1727,7 +1727,13 @@
   .tl-sticky {
     position: sticky;
     top: 0;
+    /* 100vh is the LARGE viewport on iOS (URL bar collapsed). When the bar
+       is showing the panel is taller than what's visible, breaking the
+       pinning effect. 100svh is the SMALL viewport (URL bar showing) so the
+       panel always fits within the visible area on every device state.
+       Fall back to 100vh for browsers without svh support. */
     height: 100vh;
+    height: 100svh;
     overflow: hidden;
     background: #385988;
     display: flex;
@@ -2702,8 +2708,7 @@
     /* Footer */
     footer { padding: 4rem 2rem 3rem; }
 
-    /* Timeline — disable horizontal scroll, show vertically */
-    .tl-sticky { top: 100px; }
+    /* Timeline — sticky panel inherits 100svh from base styles */
   }
 
   /* ── MOBILE (≤ 768px) ──────────────────────────────────────── */
@@ -2934,7 +2939,8 @@
     .tl-nav { height: 40px; padding: 0 1.2rem; }
     .tl-nav-abbr { font-size: 0.65rem; }
     .tl-mname { font-size: 0.65rem; letter-spacing: 0.18em; }
-    .tl-sticky { top: 88px; height: calc(100vh - 88px); }
+    /* Sticky panel inherits desktop 100svh — nav is non-sticky so no offset
+       needed. svh ensures the panel fits regardless of iOS URL bar state. */
 
     /* Region */
     .region {
@@ -5177,18 +5183,22 @@ font-weight: 700;
     // horizontal offset (trackPos) directly from how many pixels of the outer
     // have scrolled past. No wheel handler, no scroll-locking, no activation
     // flags — works identically for wheel, trackpad, scroll bar, and keyboard.
+    //
+    // SKIP-ON-REWIND behaviour:
+    //   • Once the user has completed the horizontal scroll going down (made
+    //     it past the section), we mark it as "seen." If they later scroll
+    //     back UP and re-enter the section from below, we smooth-scroll them
+    //     past it to the top, so they don't have to play the horizontal scroll
+    //     in reverse.
+    //   • If they go all the way above the section, the "seen" flag clears
+    //     so a fresh downward pass plays the horizontal scroll normally.
 
     var trackPos = 0; // current horizontal offset in px
     var rafId = null;
+    var seen = false;            // true once user has scrolled past section
+    var lastScrollY = window.scrollY;
 
     // ── Set outer height ────────────────────────────────────────────────────
-    // The outer div is sized to (viewport height + horizontal travel). As the
-    // page scrolls through this tall outer, the panel (position:sticky) pins
-    // at the top of the viewport, and we map the scrolled-past distance into
-    // trackPos. This is a classic scroll-jacking pattern and it removes any
-    // dependency on wheel events, cursor position, or activation flags —
-    // every input method that produces page scroll (wheel, trackpad, scroll
-    // bar, keyboard, touch) drives the timeline correctly.
     function setHeight () {
       sizeImages();
       requestAnimationFrame(function () {
@@ -5196,9 +5206,14 @@ font-weight: 700;
           var trackW = track.scrollWidth;
           var vpW = viewport.clientWidth;
           outer._travel = Math.max(0, trackW - vpW);
-          // Outer height = 1 viewport (the pin duration) + the horizontal travel.
-          // Scrolling through `travel` pixels of page advance = full horizontal scroll.
-          outer.style.height = (window.innerHeight + outer._travel) + 'px';
+          // Base on the sticky panel's actual rendered height, NOT
+          // window.innerHeight. On iOS, window.innerHeight can change with
+          // URL bar state, which mismatches the CSS `100svh` on the panel
+          // and causes scroll to "get stuck" (the outer ends before the
+          // travel is exhausted, or vice versa). Reading the panel's real
+          // height keeps the math consistent regardless of URL bar state.
+          var stickyH = sticky.offsetHeight || window.innerHeight;
+          outer.style.height = (stickyH + outer._travel) + 'px';
         });
       });
     }
@@ -5273,11 +5288,48 @@ font-weight: 700;
     // and the panel un-pins naturally as the user keeps scrolling.
     var clickAnimRunning = false;
     function updateFromScroll () {
-      // If a click-to-jump animation is running, it owns trackPos until it ends.
-      if (clickAnimRunning) return;
+      if (clickAnimRunning) {
+        lastScrollY = window.scrollY;
+        return;
+      }
       var travel = outer._travel || 0;
+      if (travel === 0) {
+        lastScrollY = window.scrollY;
+        return;
+      }
+
       var rect = outer.getBoundingClientRect();
-      // How many pixels of the outer div have scrolled past the viewport top?
+      var dy = window.scrollY - lastScrollY;
+      // Use a 2px hysteresis to ignore inertial jitter — only count real
+      // upward movement, not the wobble at end of a downward scroll.
+      var scrollingUp = dy < -2;
+      lastScrollY = window.scrollY;
+
+      // Mark "seen" once the user reaches the end of the horizontal scroll.
+      if (rect.bottom <= window.innerHeight + 1) {
+        seen = true;
+      }
+      // If the user scrolls all the way ABOVE the section, clear the flag.
+      if (rect.top >= 0) {
+        seen = false;
+      }
+
+      // SKIP-ON-REWIND: instant jump past the section when user scrolls up
+      // having already seen it. INSTANT (no animation) avoids fighting the
+      // user's continued wheel input, which was causing the glitch — an
+      // animated scroll competes with native scroll-position updates from
+      // ongoing wheel deltas. A single atomic scrollTo is seamless.
+      if (seen && scrollingUp && rect.top <= 0 && rect.bottom > 0) {
+        var outerTopAbs = window.scrollY + rect.top;
+        // Land 1px above the section so the next upward scroll event
+        // continues naturally into the content above.
+        window.scrollTo(0, Math.max(0, outerTopAbs - 1));
+        seen = false;
+        lastScrollY = window.scrollY;
+        return;
+      }
+
+      // Normal mapping while inside the section going down (or first pass).
       var scrolledPast = -rect.top;
       var newPos = Math.max(0, Math.min(travel, scrolledPast));
       if (Math.abs(newPos - trackPos) > 0.5) {
@@ -5286,6 +5338,7 @@ font-weight: 700;
         rafId = requestAnimationFrame(renderTrack);
       }
     }
+
     window.addEventListener('scroll', updateFromScroll, { passive: true });
     updateFromScroll();
 
